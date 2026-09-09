@@ -196,11 +196,23 @@
       unsubCount = ref.collection('students').onSnapshot(snap => { count = snap.size; render(); });
     });
 
-    let editing = false;
+    let editing = false, lastView = '';
     function render() {
       if (!session) return;
       const groups = session.groups || null;
       const myIdx = groups ? groups.findIndex(g => g.members.some(m => m.uid === uid)) : -1;
+
+      // 判斷目前應顯示哪個畫面；若畫面沒變（只是人數更新），只更新數字，不重畫表單，避免同學輸入到一半被清掉
+      const view = groups && myIdx >= 0 ? `result:${myIdx}:${groups[myIdx].members.length}`
+        : groups && myDoc ? 'unassigned'
+        : myDoc && !editing ? `waiting:${myDoc.name}:${myDoc.studentId}:${session.status}`
+        : session.status !== 'open' && !myDoc ? 'closed'
+        : `form:${editing}`;
+      if (view === lastView) {
+        const c = document.getElementById('countTxt'); if (c) c.textContent = count;
+        return;
+      }
+      lastView = view;
 
       // 已分組
       if (groups && myIdx >= 0) {
@@ -222,7 +234,7 @@
       if (myDoc && !editing) {
         panel.innerHTML = `<h2>報到完成 ✓</h2>
           <p style="margin:10px 0 0;font-size:16px"><b>${esc(myDoc.name)}</b>　<span class="muted">${esc(myDoc.studentId)}</span></p>
-          <p class="muted" style="margin-top:18px"><span class="pulse"></span>目前 ${count} 位同學已報到，等待老師抽籤…結果會直接出現在這裡，請不要關閉頁面。</p>
+          <p class="muted" style="margin-top:18px"><span class="pulse"></span>目前 <span id="countTxt">${count}</span> 位同學已報到，等待老師抽籤…結果會直接出現在這裡，請不要關閉頁面。</p>
           ${session.status === 'open' ? `<button class="ghost" id="editBtn" type="button">資料打錯了？修改</button>` : ''}`;
         document.getElementById('editBtn')?.addEventListener('click', () => { editing = true; render(); });
         return;
@@ -234,7 +246,7 @@
       }
       // 報到表單
       panel.innerHTML = `<h2>${editing ? '修改資料' : '請報到'}</h2>
-        <p class="muted" style="margin-top:6px">目前 ${count} 位同學已報到</p>
+        <p class="muted" style="margin-top:6px">目前 <span id="countTxt">${count}</span> 位同學已報到</p>
         <div class="field"><label for="name">姓名</label><input id="name" type="text" maxlength="30" autocomplete="name" value="${esc(myDoc?.name || '')}"></div>
         <div class="field"><label for="sid">學號</label><input id="sid" type="text" maxlength="20" autocomplete="off" autocapitalize="characters" value="${esc(myDoc?.studentId || '')}"></div>
         <button class="primary block" id="joinBtn" type="button">${editing ? '儲存' : '完成報到'}</button>
